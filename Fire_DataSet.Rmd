@@ -1,0 +1,571 @@
+---
+title: "Wildfire in Black Hills"
+author: "snk5330"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::downcute:
+    highlight: kate
+    toc-level: 4
+    toc=TRUE:
+    default: dark
+---
+
+```{r, echo=FALSE}
+knitr::include_graphics("Wildfires_in_Black_Hills.jpg")
+
+```
+
+# Wildfires in Black Hills National Forest
+
+## Introduction
+
+Intended Audience: Whitney A. Rencountre II, Chief Executive Officer of Crazy Horse Memorial and The Indian University of North America at Crazy Horse Memorial.[^1] I have been asked to provide a spatial analysis of wildfires in Black Hills National Forest to provide Crazy Horse Memorial with the context to make educated decisions on the development of their memorial and university.
+
+[^1]: Black Hills National Forest draft forest assessments: Fire and fuels. (2022). USDA Forest Service . <https://www.fs.usda.gov/Internet/FSE_DOCUMENTS/fseprd1035064.pdf>
+
+### Background
+
+Crazy Horse Memorial is a site in Black Hills, South Dakota that is dedicated to supporting Native Americans by providing educational programming, promoting harmony, preserving Native American history, and paying tribute to Crazy Horse, a respected Lakota leader from the 1800s.[^2] It is located in Black Hills National Forest, which is a 1.2 million-acre stretch of forest in western Dakota and northeastern Wyoming. The forest is approximately 110 miles long and 70 miles wide. The Black Hills are sacred to the Lakota, who once relied on the area as hunting grounds for bison.[^3]
+
+[^2]: Gilbertson-Day, J., Scott, J., Olszewski, J., Vogler, K., Napoli, J., Moran, C., Callahan, M., & Jaffe, M. (2022). *Contemporary wildfire hazard on the Black Hills National Forest*. United States Forest Service, PyroLogix. <https://www.fs.usda.gov/Internet/FSE_DOCUMENTS/fseprd1115428.pdf>
+
+[^3]: *Blackhills History and Culture*. (n.d.). USDA.Gov; USDS. <https://www.fs.usda.gov/detail/blackhills/learning/history-culture/?cid=stelprdb5116985>
+
+With a deeper understanding of the spatial patterns of fires in Black Hills, Crazy Horse Memorial can make sound decisions in its expansion. Knowing the areas where fires most frequently occur, visualizing temporal patterns of the fire, and analyzing the severity of the fires can contextualize the business decisions of the memorial. It can also help the memorial develop an educated contingency plan if a part of the memorial is destroyed in a wildfire.
+
+A report with a similar goal has also been shared with Black Hills National Forest. The United States Forest Service and PyroLogix published a report that assesses the rick of wildfire across the forest through predicting burn probability and fire intensity across the forest.[^4] This report uses simulations to visualize the current threat of wildfires to the forest. The USDA also published a report on fire and fuels conditions trends that examines how wildfire severity and frequency has changed over time, and what that means for Black Hills.[^5]
+
+[^4]: Gilbertson-Day, J., Scott, J., Olszewski, J., Vogler, K., Napoli, J., Moran, C., Callahan, M., & Jaffe, M. (2022). *Contemporary wildfire hazard on the Black Hills National Forest*. United States Forest Service, PyroLogix. <https://www.fs.usda.gov/Internet/FSE_DOCUMENTS/fseprd1115428.pdf>
+
+[^5]: Black Hills National Forest draft forest assessments: Fire and fuels. (2022). USDA Forest Service . <https://www.fs.usda.gov/Internet/FSE_DOCUMENTS/fseprd1035064.pdf>
+
+### Dataset
+
+The data used in this analysis was sourced from the United States Forest Service.[^6] This dataset records fire occurrence points in the United States and identifies the reason they were started for the years 1970-2022. Each point represents the location where the fire began, and the specific attributes of the data are tailored to the needs of the USFS.
+
+[^6]: *National usfs fire occurrence point(Feature layer)*. (n.d.). Retrieved December 13, 2023, from <https://data-usfs.hub.arcgis.com/datasets/usfs::national-usfs-fire-occurrence-point-feature-layer/about>
+
+    CloseDeleteEdit
+
+The dataset was last updated in March 2023. Because the primary fire season for the area is May through October, the data can be used to examine trends up until the 2023 fire season.[^7]
+
+[^7]: *Black Hills Fire Management*. (n.d.). USDA.Gov; USFS. <https://www.fs.usda.gov/main/blackhills/fire>
+
+    *Black Hills Fire Management*. (n.d.). USDA.Gov; USFS. <https://www.fs.usda.gov/main/blackhills/fire>
+
+    *Black Hills Fire Management*. (n.d.). USDA.Gov; USFS. <https://www.fs.usda.gov/main/blackhills/fire>
+
+Because this data was released by the USFS, which is an executive agency, I believe it is the most accurate dataset for wildfires in the United States.
+
+For this project, the aforementioned dataset was shortened to only include wildfire incidences in Black Hills National Forest. This means that only wildfires with points of origin in Black Hills are included, which means one also must consider edge effects while reading this report. If a wildfire affected a part of the forest, but the origin point is not in the parameters of the forest, it will not be included in this analysis. It is also important to note that most origin points are estimates.
+
+### Structure of the data
+
+The dataset uses the following columns to mark each wildfire incidence point:
+
+-   LONG: The longitude of each wildfire origin point.
+
+-   LAT: The latitude of each wildfire origin point.
+
+-   TOTALACRES: The total acres burned in the wildfire.
+
+-   OBJECTID: The primary key of the data; the ID of each fire.
+
+-   FIRENAME: The name of the fire.
+
+-   FIREDAY: The day of the month that the fire occurred.
+
+-   FIREMONTH: The month that the fire occurred.
+
+-   FIREYEAR: The year that the fire occurred.
+
+-   STATCAUSE: The cause of the fire.
+
+-   PROTECTIONAGENCY: The protection agency tasked with responding to the fire.
+
+### Quality control/Data wrangling
+
+I removed the PROTECTIONAGENCY column because all but one of the values for this column was USFS. The other fire was an extremely small house fire and had the value of "private," so I did not think that this column provided necessary information. I also removed the FIREDAY column because I will be focusing on trends over months and years, but this can be added again later if needed. All included rows have LONG and LAT values, so no records need to be removed.
+
+## Exploratory Analysis
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message = FALSE)
+rm(list=ls())
+library(sp)
+library(sf)
+library(tidyverse)
+library(tmap)
+library(readxl)
+library(plotly)
+library(spatstat)
+library(ggstatsplot)
+library(tigris)
+library(FedData)
+library(raster)
+library(elevatr)
+library(exactextractr) 
+library(ggplot2)
+library(hrbrthemes)
+library(MASS)
+library(gridExtra)
+library(ggeffects)
+library(spdep)
+```
+
+```{r, include=FALSE}
+newfire <- read.csv("BlackHillsNatForest_Fire.csv")
+```
+
+```{r, include=FALSE}
+#remove protection agency
+newfire <- newfire[,c("LONG", "LAT", "TOTALACRES", "OBJECTID", "FIRENAME", "FIREMONTH", "FIREYEAR", "STATCAUSE")]
+```
+
+```{r, include=FALSE}
+dim(newfire)
+```
+
+```{r}
+summary(newfire)
+```
+
+There are 5,300 wildfire incidences recorded in this dataset. Fires occur most often in June and July, with the most occurring in June (1593) and the fewest occurring in January and December (31 each). They are most often caused by lightning. followed by human causes, such as burning, camping, railroads, and smoking also cause a high number of the fires.
+
+```{r, include=FALSE}
+table(newfire$STATCAUSE)
+```
+
+```{r, include = FALSE}
+table(newfire$FIREMONTH)
+```
+
+The data also reveal a general downward trend of fire incidences since the 1970s.
+
+```{r}
+hist(newfire$FIREMONTH, main="Month of Fire", xlab = "Month")
+```
+
+```{r}
+hist(newfire$FIREYEAR, main="Year of Fire", xlab = "Year")
+```
+
+There is one outlier of interest in total acres burned. This wildfire, named Jasper, occurred in August 2000 and burned a total of 83,508 acres in the southern area of the forest.[^8]
+
+[^8]: Basis, S. on a D., Holidays, E., operations, days with limited visitor services P. be advised that after-hours messages are not taken on the system; visitors are encouraged to call the visitor center during normal, & Us, speak with a park ranger for assistance C. (n.d.). *The jasper fire---Jewel cave national monument(U. S. National park service)*. Retrieved December 13, 2023, from <https://www.nps.gov/jeca/learn/nature/jasperfire.htm>
+
+    CloseDeleteEdit
+
+```{r, include=FALSE}
+newfire.sf <- st_as_sf(newfire,coords=c("LONG","LAT"),crs=4236)
+qtm(newfire.sf)
+```
+
+```{r, include=FALSE}
+newfire.sf.utm <- (st_transform(newfire.sf,crs=26912))
+```
+
+```{r, include = FALSE}
+newfire.sf.utm$Acres_Burned <- cut(newfire.sf.utm$TOTALACRES,
+                       breaks=c(0,1,10,100,Inf), labels=c("0-1 acres", "1-10 acres", "10-100 acres", "100+ acres"))
+```
+
+```{r}
+tmap_mode("view") 
+qtm(newfire.sf.utm,dots.col="Acres_Burned",dots.size=.2,dots.palette="Reds", basemaps = "Esri.WorldTopoMap")+
+        tm_layout(legend.outside = TRUE)
+```
+
+When the origin points are plotted, it appears that the fires are more clustered on the eastern side of the boundary of the dataset. This is important to note as we move onto more analysis, as Crazy Horse Memorial is close to, but not within, this clustering. To better understand incidences of the wildfires, hover over any point on this map to see the total acres burned by each wildfire. Fires with a small burn area are most common, but areas with fewer wildfires appear to have higher severity of wildfires. Where Crazy Horse Memorial is located, it appears that wildfires happen with relatively high frequency, but with relatively low burn area.
+
+We can also see how the nonconformity of this space has created first-order autocorrelation in this dataset, but it is unclear if this is due to sampling error or the space itself. For instance, at the southwest of the dataset, there is an area that is not within Black Hills Forest, but still has some fire incidences. This has both residential area and physical landforms that could create sampling error, such as Hell Canyon. When looking at this data, we must keep in mind that this area may be experiencing fires that are not being recorded by the Forest Service. Luckily, Crazy Horse Memorial is not located near this area.
+
+```{r, include = FALSE}
+newfire.ppp <- as.ppp(newfire.sf.utm)
+plot(newfire.ppp, pch = 3) 
+```
+
+## Point Pattern Analysis
+
+To examine patterns in this data, I first would like to quantify clustering in this data by performing a variance-mean ratio (VMR) test. If the VMR of this data is high, that means that the pattern of this data is clustered. However, if it is closer to zero, that means it is more uniform.
+
+```{r, include=FALSE}
+#table of counts 
+Q <- quadratcount(newfire.ppp, nx = 4, ny = 5) 
+print(Q)
+```
+
+```{r}
+newfire.variance <- var(as.vector(Q))
+newfire.mean <- mean(as.vector(Q))
+
+newfire.VMR <- newfire.variance / newfire.mean
+print(newfire.VMR)
+```
+
+The VMR of this dataset is 132.4091, which indicates that the points on this data have a very high level of clustering. To visualize this pattern, I will perform a quadrat analysis to see a general idea of where fires are most common in Black Hills.
+
+```{r}
+plot(newfire.ppp, use.marks = F, cex = 0.1, pch = 1, main="Quadrat Count of Fire Incidence Points") 
+plot(Q, add = TRUE, cex = 1)
+```
+
+Since the area included in this dataset is rectangular, I decided to make a plot that listed the counts in each equally-shaped rectangle in the given area. I divided the data into twenty rectangles, with four along the x-axis and five along the y-axis. This gives a general idea of where points are clustered, with higher numbers along the two second-most northern quadrats on the far eastern side. The two boxes diagonally south of these boxes also have very high counts per box. When a smoother point-pattern analysis is performed, I expect to see a diagonal cluster of fire points in this area.
+
+```{r, include=FALSE}
+intensity(Q)
+```
+
+```{r}
+plot(intensity(Q, image=TRUE), main="Point Intensity of Wildfire Incidence Points", las=1) 
+plot(bei, pch=20, cex=0.6, add=TRUE)
+```
+
+I performed a similar analysis using point intensity. This plot makes it easier to see the clustering of points in those four boxes near the east side of Black Hills.
+
+It is important to note that the modifiable areal unit problem (MAUP) will cause bias in this (and any) quadrat analysis. MAUP occurs whenever point patterns are aggregated into areal units, such as these quadrats. This causes patterns to appear different when different aggregation sizes and methods are used. In this case, the patterns we see in this data may change significantly if I used a ten-by-ten quadrat aggregation instead of four-by-five. The effects of MAUP can be diminished by creating smaller quadrats, but point-based methods that do not use aggregation skip this problem altogether.
+
+Before moving on to methods that are not affected by MAUP, I first will perform a quadrat test that tests the following hypotheses:
+
+H0: Our pattern was caused by an Independent Random Process. Any clustering/dispersion is random chance. On average, the VMR = 1.
+
+H1: Our pattern is unusually different to one caused by an Independent Random Process. The VMR is likely to be unusually high or unusually low.
+
+```{r}
+quadrat.test(newfire.ppp)
+```
+
+With a p-value so low, we have enough evidence to reject H0 and say that an independent random process is unlikely to have caused this pattern. This indicates that there may be underlying processes that cause the fires to be distributed in this way, such as the nonuniformity of the land of Black Hills.
+
+Next, I will perform a kernel density smoothing for this data. This will allow for the analysis of the point pattern without aggregation.
+
+First, I will make a basic point density heat map of the fire occurrences.
+
+```{r}
+PointDensity <- density(newfire.ppp)
+plot(PointDensity, main = "Point Density Map of Wildfire Instances")
+```
+
+As seen in our quadrat analysis, there appears to be a diagonally-shaped hotspot of fires along the east side of our dataset area. This density map gives more insight into the way the intensity of points fades very quickly going south, but more slowly going northwest.
+
+Now, I will use an algorithm that finds "optimal" smoothing (known as bandwidth) for this dataset.
+
+```{r}
+optimal_diggle <- bw.diggle(newfire.ppp)
+
+plot (density(newfire.ppp,sigma = optimal_diggle), 
+      main=paste("Diggle Bandwidth Estimation = ",round(optimal_diggle,3)))
+
+plot(bei, add = TRUE,use.marks = F, cex = 0.5,pch=16)
+```
+
+This plot shows hotspots in the data with much less smoothing. In this instance, we can see that the fires are clustered along the east side of the dataset, but we also see the shape of the points going south from the main cluster, avoiding the mountain range at the south of the forest.
+
+I will next perform a nearest-neighbor analysis on this dataset. In this analysis, the distance of the point closest to each point is recorded. Having a low nearest neighbor average indicates that many points are close together, or clustered.
+
+```{r, include=FALSE}
+newfire_nnd <- nndist(newfire.ppp)
+```
+
+```{r}
+ hist(newfire_nnd,br=20, main = "Wildfire Nearest Neighbor Distances", xlab="Nearest Neighbor Distance (m)")
+```
+
+```{r}
+paste( c("The average nearest neighbour fire instances in this dataset is "),
+        round(mean(newfire_nnd),3),"m away")
+```
+
+When I create a histogram of the nearest neighbor distances, we see that the bin with the highest number of distances is the lowest distance column. This indicates clustering in this data. The average nearest neighbor of fire instances in this data is only 371.132 meters, which measures just how close these fire instances are on average.
+
+Next, I will perform a Clark Evans test, which quantifies the clustering of points using nearest neighbor distances as a ratio R. If the data is clustered, then R \< 1, if the data is random, then R = 1, and if the data is uniform, then R \>1. I will use this method to test the following hypotheses:
+
+H0: This pattern in fire instances is caused by an independent random process. The underlying R is equal to 1. Any difference in R we see is simply random chance.
+
+H1: The pattern in fire instances is not caused by an independent random process. The underlying R is not equal to 1.
+
+```{r}
+clarkevans.test(newfire.ppp, correction='cdf', alternative="two.sided")
+```
+
+This gave an R value of .5811 and a p-value of .002. The R value indicates that there is clustering in the data, and the p-value indicates that there is high significance for this point. With a p-value so low, we reject the null hypothesis. The pattern in fire instances is not likely to be caused by an independent random process. Further analysis will be completed to find the underlying processes that may cause this clustering.
+
+I will now perform an L-analysis on this data. This measures clustering in data by plotting points against an envelope of where the data would be random and not clustered or dispersed.
+
+```{r}
+L <- Lest(newfire.ppp)
+l_env <- envelope(newfire.ppp, Lest, nsim=100, nrank=1, savepatterns=TRUE, savefuns=TRUE)
+par(mar=c(4,4,0,8))
+plot(l_env, . -r ~ r, main=NULL, las=1, legendargs=list(cex=.8,xpd=TRUE, inset=c(1.01,0)))
+```
+
+This plot shows that the L-function line is far above the calculated envelope that would indicate random scatter. This indicates that there is a very high level of clustering among all distance levels, and that the clustering is stronger with larger radii between points. This means that the wildfires are clustered among all scales of this data.
+
+## Analysis Using Weather and Elevation
+
+To further examine the conditions in Black Hills that may affect Crazy Horse Memorial and Univeristy, I also examine weather conditions, such as annual rainfall and average temperature, and elevation in Black Hills at the fire instances.
+
+```{r, include=FALSE}
+worldclim.BIO <- raster::getData(name = 'worldclim', var = 'bio', res = 2.5)
+```
+
+```{r, include=FALSE}
+#------------------------------------------------
+# Average annual temp
+#------------------------------------------------
+worldclim.Annual.Mean.Temperature <- worldclim.BIO$bio1
+# For some reason Temperature is  stored in degrees C *10 , so
+worldclim.Annual.Mean.Temperature <- worldclim.Annual.Mean.Temperature/10
+
+#------------------------------------------------
+# Rain see above for the codes
+#----------------------------------------------
+worldclim.Annual.Mean.Rain <- worldclim.BIO$bio12
+```
+
+```{r, include=FALSE}
+# change projection
+newfire.sf <- st_transform(newfire.sf,4326)
+
+
+# add to point data
+newfire.sf$AnnualRain <- raster::extract(worldclim.Annual.Mean.Rain,
+                                                  newfire.sf)
+
+
+newfire.sf$AnnualMean_temp <- raster::extract(worldclim.Annual.Mean.Temperature,newfire.sf)
+
+# change projection back
+newfire.sf <- st_transform(newfire.sf,3744)
+```
+
+```{r}
+tmap_mode('view')
+qtm(newfire.sf,dots.col="AnnualRain",dots.size=.2,dots.palette="Blues", basemaps = "Esri.WorldTopoMap")+
+        tm_layout(legend.outside = TRUE, title = "Yearly Rainfall at Fire Incidence points (mm)")
+```
+
+This map indicates a significant level of spatial autocorrelation with rainfall. There appears to be much higher rainfall at the north of this dataset, with a strong level of clustering in a circular shape near the northernmost part of Black Hills near Windy Flats and Elk and Bear Butte Creeks. The rain appears to decrease in intensity distance from this cluster increases.
+
+This leaves Crazy Horse Memorial in an area of relatively moderate rainfall. While there are fewer recorded incidences of fires within the mountains at the southwest of the forest it appears that there is a trend of decreasing rain in the southwest direction.
+
+```{r}
+tmap_mode('view')
+qtm(newfire.sf,dots.col="AnnualMean_temp",dots.size=.2,dots.palette="Reds", basemaps = "Esri.WorldTopoMap")+
+        tm_layout(legend.outside = TRUE, title = "Mean Annual Temperature at Fire Incidence points (degrees Celsius)")
+```
+
+Like the rainfall map, temperature appears to have high clustering and first-order spatial autocorrelation. This shows a pattern of clustering of low temperatures at a point in the northwest of Black Hills near Castle Creek with increasing temperature as the distance from this point increases, especially as we look south. Next, we will observe elevation, as this trend in temperature may be related to elevation.
+
+```{r}
+ggplot(newfire.sf, aes(x = AnnualMean_temp, y = AnnualRain)) +
+    geom_point() + 
+  labs(
+        x = "Annual Mean Temperature (degrees Celsius)",
+        y = "Annual Rainfall (mm)",
+        title = "Annual Mean Temperature vs Annual Rainfall")
+```
+
+There appears to be a moderately strong, negative association between annual mean temperature and annual rainfall. There is some fanning of the residuals within this pattern, but there do not appear to be any outliers.
+
+```{r, include=FALSE}
+elevation.raster_newfire <- elevatr::get_elev_raster(newfire.sf, z = 5,clip="locations")
+```
+
+```{r, include=FALSE}
+newfire.sf$Elevation_extracted <- raster::extract(elevation.raster_newfire,newfire.sf)
+```
+
+```{r, include=FALSE}
+#--------------------------------------------------------------
+# Turn everything to the same map projection
+#--------------------------------------------------------------
+newfire.sf  <-  st_transform(newfire.sf,4326)
+elevation.raster_newfire <- raster::projectRaster(elevation.raster_newfire,crs=4326)
+
+#--------------------------------------------------------------
+# add to point data
+#--------------------------------------------------------------
+newfire.sf$Elevation <- raster::extract(elevation.raster_newfire,newfire.sf)
+
+#--------------------------------------------------------------
+# Turn everything to the final map projection
+#--------------------------------------------------------------
+elevation.raster_newfire  <- raster::projectRaster(elevation.raster_newfire,crs=3744)
+newfire.sf <-  st_transform(newfire.sf,3744)
+
+```
+
+```{r}
+tmap_mode("view")
+
+map_elev     <- qtm(newfire.sf,dots.col="Elevation",title="Height Above Sea Level (m)",
+                   dots.size=.1,dots.palette="PuRd", basemaps = "Esri.WorldTopoMap")+
+        tm_layout(legend.outside = TRUE,legend.outside.position  = "bottom")
+
+map_temp <- qtm(newfire.sf,dots.col="AnnualMean_temp",dots.size=.1,dots.palette="Reds", basemaps = "Esri.WorldTopoMap")+
+        tm_layout(legend.outside = TRUE, title = "Mean Annual Temperature at Fire Incidence points (degrees Celsius)")
+
+tmap_arrange(map_elev,map_temp,ncol=2)
+```
+
+It appears that temperature is strongly associated with elevation. Height above sea level peaks at the southwest side of the dataset in the mountain range, and this is where temperature is lowest. Relative to this dataset, Crazy Horse Memorial is located in an area of moderate elevation and temperature.
+
+After observing this data, I will look at the relationship between annual rainfall and total acres burned, with annual rainfall as a predictor of total acres burned.
+
+```{r}
+gghistostats(
+  data       = newfire.sf, 
+  x          = TOTALACRES, 
+  title      = "Total Acres Burned",
+  type = "parametric",
+  xlab = NULL,
+  ggthemes::theme_tufte(),
+  binwidth   = 1)
+```
+
+As seen in this histogram, this data is extremely positively skewed. Because most fires burn less than one acre, and there is an outlier above 80,000 acres, I will first try to trim the dataset to exclude outliers using an upper limit of 1.5 times the IQR of this data. This makes the total acres burned range between zero and two, with a mean of .35 acres and a mode in the bin centered at zero acres.
+
+```{r}
+quartiles <- quantile(newfire.sf$TOTALACRES, probs=c(.25, .75), na.rm = FALSE)
+IQR <- IQR(newfire.sf$TOTALACRES)
+ 
+Lower <- quartiles[1] - 1.5*IQR
+Upper <- quartiles[2] + 1.5*IQR 
+ 
+acres_no_outlier <- subset(newfire.sf, newfire.sf$TOTALACRES > Lower & newfire.sf$TOTALACRES < Upper)
+ 
+gghistostats(
+  data       = acres_no_outlier, 
+  x          = TOTALACRES, 
+  title      = "Total Acres Burned, No Outliers ",
+  type = "parametric",
+  xlab = NULL,
+  ggthemes::theme_tufte(),
+  binwidth   = .2)
+```
+
+Still, this data is extremely positively skewed. Thus, to better fit the linear model, I will analyze the log of the total acre values instead.
+
+```{r}
+newfire.sf$logAcres=log(newfire.sf$TOTALACRES)
+```
+
+```{r}
+gghistostats(
+  data       = newfire.sf, 
+  x          = logAcres, 
+  title      = "Total Acres Burned",
+  type = "parametric",
+  xlab = NULL,
+  ggthemes::theme_tufte(),
+  binwidth   = 1)
+```
+
+While still positively skewed, this is much less skewed than our untransformed data. Still, it is important to note that there are still very few values below -2. We will keep that in mind while analyzing this relationship. There is a very strong mode around -2, with the proportion of this bin making up around 60% of data points. The mean of this data is -1.24.
+
+```{r}
+gghistostats(
+  data       = newfire.sf, 
+  x          = AnnualRain, 
+  title      = "Annual Rainfall (mm))",
+  type = "parametric",
+  xlab = NULL,
+  ggthemes::theme_tufte(),
+  binwidth   = 50)
+```
+
+Luckily, annual rainfall is much more normally distributed, so no transformations are necessary. The mean of this data is 528.36mm, with a mode around 500.
+
+```{r}
+newfire.sf$Acres_Burned <- cut(newfire.sf$TOTALACRES,
+                       breaks=c(0,1,10,100,Inf), labels=c("0-1 acres", "1-10 acres", "10-100 acres", "100+ acres"))
+
+tmap_mode("view") 
+map1 <- qtm(newfire.sf,dots.col="Acres_Burned",dots.size=.2,dots.palette="Reds", basemaps = "Esri.WorldTopoMap")+
+        tm_layout(legend.outside = TRUE)
+map2 <- qtm(newfire.sf,dots.col="AnnualRain",dots.size=.2,dots.palette="Blues", basemaps = "Esri.WorldTopoMap")+
+        tm_layout(legend.outside = TRUE)
+
+tmap_arrange(map1,map2)
+```
+
+In these maps, no apparent pattern appears to occur between total acres burned and annual rainfall. Perhaps, this would require one to also observe the month or season that these fires took place as an interaction term. From these maps, I am not inclined to believe that there is an association between rainfall and total acres.
+
+```{r}
+LinearFit <- lm(logAcres ~ AnnualRain, data = newfire.sf, na.action="na.exclude")
+
+newfire.sf$ModelledOutput   <- predict(LinearFit)
+newfire.sf$Linear.Residuals <- residuals(LinearFit)
+
+# with linear trend
+ggplot(newfire.sf, aes(x=AnnualRain, y=logAcres)) +
+  geom_point() +
+  geom_smooth(method=lm , color="red", se=FALSE) +
+  theme_ipsum()
+```
+
+```{r}
+ggplot(newfire.sf, aes(x=AnnualRain, y=Linear.Residuals)) +
+  geom_point() +
+  theme_ipsum()
+```
+
+```{r}
+summary(LinearFit)
+```
+
+```{r}
+ggplot() +
+  geom_qq(aes(sample = rstandard(LinearFit))) +
+  geom_abline(color = "red") +
+  coord_fixed()
+```
+
+The regression on this data shows a weak negative association between annual rainfall and the logarithm of total acres burned. The scatterplot for this association appears to be random scatter, and the residual plot has a positive and linear pattern. There appear to be some outliers at the high end of the y-axis, but these are more so outliers from total acres burned rather than the overall "trend." A QQ plot of the residuals also indicates that the linear model is not appropriate, as the residuals do not follow the normal line.
+
+The resulting equation states that, for every additional milimeter of rainfall at a point, the logarithm of total acres burned increases by .0008 acres. The R^2^ value for this dataset is very low, at .002, meaning that this is a very weak association. The p-value is also very low, indicating that this is highly representative of the relationship between annual rainfall and total acres burned.
+
+Given that I could not see a pattern in the data in the maps, I believe that there is very little interaction between these variables.
+
+```{r}
+map1 <- qtm(newfire.sf,dots.col = "logAcres" , dots.palette="Reds") + 
+  tm_layout(legend.outside = TRUE)
+
+map2 <- qtm(newfire.sf,dots.col = "ModelledOutput",dots.palette="Blues") + 
+  tm_layout(legend.outside = TRUE)
+
+map3 <- qtm(newfire.sf,dots.col = "Linear.Residuals",dots.palette="-RdBu") +
+  tm_layout(legend.outside = TRUE)
+
+tmap_arrange(map1, map2, map3)
+```
+
+The modeled output looks almost identical to the annual rain distribution map, and it does not at all represent what is seen in the actual output. The residual map shows random scatter across space, indicating that space likely has very little interaction on this relationship. I do not believe there is a spatial pattern in this relationship, even though there appears to be a strong spatial pattern of rainfall.
+
+I would use a Moran's I test and scatterplot to confirm that there is very little spatial influence on this relationship. I could create a Moran's I scatterplot of the residuals of a feature versus the residuals of its neighbors to determine if there is a spatial trend in the fit of the model. I could also conduct a bivariate LISA to measure the autocorrelation between annual rainfall of a feature and the average total acres burned of its neighboring features. This would also indicate autocorrelation on this model.
+
+### Interaction of Month
+
+To test if there is an interaction between the month a fire took place and the relationship between total acres burned and annual rainfall, I will add months as an interaction term. I will break up the months by season to the best of my ability to best aggregate the months in a visually pleasing way.
+
+```{r}
+newfire.sf$season <- cut(newfire.sf$FIREMONTH, breaks = c(1, 3, 6, 9,12), labels = c('Winter', 'Spring', 'Summer', 'Fall'))
+
+```
+
+```{r}
+threeVariableModel <- lm(logAcres~AnnualRain*season, data= newfire.sf)
+
+summary(threeVariableModel)
+```
+
+```{r}
+ggpredict(threeVariableModel, terms = c("AnnualRain", "season")) |> plot()
+```
+
+It appears that season may interact with this model. While the spring, summer, and fall seasons all have negative parallel slopes, the winter season has a much stronger negative slope that intersects the other seasons' lines. This indicates that, during the winter, the acres burned decreases more quickly as annual rainfall increases at a given incidence point than during other seasons. Still, because there are much fewer fires in the winter than during other seasons, this may be due to the small sample size in winter.
+
+## Conclusion
+
+While Crazy Horse Memorial and University is in an area of high incidences of wildfires compared to the rest of the United States, the fires in its area tend to be small in their burn area. The Memorial is located at an area of moderate temperature, elevation, and rainfall in comparison with the rest of Black Hills. Although we did not test for the association of temperature and elevation on this model with the severity of fires, it appears that there is very little association with annual rainfall and fire severity at a given incidence point. Overall, severe fires are rare in Black Hills, and they appear to be especially rare in the Crazy Horse Memorial and University area.
